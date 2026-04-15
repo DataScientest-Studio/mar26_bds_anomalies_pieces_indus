@@ -21,12 +21,19 @@ dependencies = [
     "seaborn>=0.13",
     # Computer vision
     "opencv-python>=4.8",
+    "umap-learn>=0.5.12",
 ]
 
 [project.optional-dependencies]
 app = [
     "streamlit>=1.30",
 ]
+# PyTorch variants — sélection via `uv sync --extra cu121` (ou cu124 / cu128 / cpu).
+# Le bloc [tool.uv.sources] plus bas redirige torch/torchvision vers le bon index PyTorch.
+cpu = ["torch>=2.1", "torchvision>=0.16"]
+cu121 = ["torch>=2.1", "torchvision>=0.16"]
+cu124 = ["torch>=2.1", "torchvision>=0.16"]
+cu128 = ["torch>=2.1", "torchvision>=0.16"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
@@ -34,3 +41,62 @@ packages = ["src"]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+    "ipywidgets>=8.1.8",
+]
+
+# ---------------------------------------------------------------------------
+# uv — support multi-CUDA pour torch / torchvision
+#
+# Usage :
+#   uv sync --extra cu128     # machines avec CUDA 12.8
+#   uv sync --extra cu124     # machines avec CUDA 12.4
+#   uv sync --extra cu121     # machines avec CUDA 12.1
+#   uv sync --extra cpu       # machines sans GPU
+#
+# Auto-détection via `uv run python scripts/install.py`
+# ---------------------------------------------------------------------------
+[tool.uv]
+conflicts = [[
+    { extra = "cpu" },
+    { extra = "cu121" },
+    { extra = "cu124" },
+    { extra = "cu128" },
+]]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu121", extra = "cu121" },
+    { index = "pytorch-cu124", extra = "cu124" },
+    { index = "pytorch-cu128", extra = "cu128" },
+]
+torchvision = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu121", extra = "cu121" },
+    { index = "pytorch-cu124", extra = "cu124" },
+    { index = "pytorch-cu128", extra = "cu128" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
