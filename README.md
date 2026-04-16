@@ -6,78 +6,77 @@ This repo is a Starting Pack for DS projects. You can rearrange the structure to
 Project Organization
 ------------
 
+
     ├── LICENSE
-    ├── README.md                  <- The top-level README for developers using this project.
+    ├── README.md                  <- Top-level README for developers using this project.
     ├── pyproject.toml             <- Project metadata and dependencies (uv / hatch).
-    ├── requirements.txt           <- Pip requirements for reproducing the analysis environment.
+    ├── requirements.txt           <- Pip requirements to reproduce the analysis environment.
     ├── uv.lock                    <- Locked dependency versions (uv).
     │
     ├── data                       <- Datasets (local only, excluded from Git).
     │   ├── raw                    <- Original, immutable data dump.
-    │   │   ├── mvtec              <- MVTec AD (15 catégories).
-    │   │   └── hss-iad            <- HSS-IAD (7 catégories).
-    │   └── processed              <- Données harmonisées prêtes à l'emploi.
+    │   │   ├── mvtec              <- MVTec AD (15 categories).
+    │   │   └── hss-iad            <- HSS-IAD (7 categories).
+    │   └── processed              <- Harmonized data ready for use.
     │       ├── unified_dataset.csv
     │       └── resolutions_sample.csv
     │
-    ├── models                     <- Modèles entraînés, prédictions, checkpoints.
+    ├── models                     <- Trained models, predictions, checkpoints.
     │
-    ├── notebooks                  <- Jupyter notebooks (numérotés pour l'ordre).
+    ├── notebooks                  <- Jupyter notebooks (ordered numerically).
     │   ├── 01_eda_harmonisation.ipynb
-    │   └── 01_eda_executed.ipynb  <- Version exécutée (via nbconvert).
     │
-    ├── references                 <- Documentation, liens, papiers (ex. HSS-IAD).
+    ├── references                 <- Documentation, links, research papers (e.g., HSS-IAD).
     │
-    ├── reports                    <- Rapports générés à partir des analyses.
+    ├── reports                    <- Reports generated from analyses.
     │   ├── eda_report.md
     │   └── figures
-    │       └── eda                <- Figures extraites du notebook EDA.
+    │       └── eda                <- Figures extracted from the EDA notebook.
     │
-    └── src                        <- Code source du projet (package Python).
+    └── src                        <- Project source code (Python package).
         ├── __init__.py
-        ├── config.py              <- Configuration centrale (chemins, params EDA).
+        ├── config.py              <- Central configuration (paths, EDA parameters).
         │
-        ├── data                   <- Pipeline de données.
+        ├── data                   <- Data pipeline.
         │   ├── __init__.py
-        │   └── harmonize.py       <- Harmonisation MVTec AD + HSS-IAD → CSV unifié.
+        │   └── harmonize.py       <- MVTec AD + HSS-IAD harmonization → unified CSV.
         │
-        ├── features               <- (à venir) extraction de features.
-        ├── models                 <- (à venir) entraînement et prédictions.
-        ├── visualization          <- (à venir) visualisations.
-        └── streamlit              <- (à venir) app de démo.
+        ├── features               <- (coming soon) feature extraction.
+        ├── models                 <- (coming soon) training and prediction.
+        ├── visualization          <- (coming soon) visualizations.
+        └── streamlit              <- (coming soon) demo application.
 
-Harmonisation des données
+Data Harmonization
 -------------------------
 
-Avant toute analyse, les deux datasets bruts doivent être téléchargés
-manuellement et placés dans :
+Before any analysis, both raw datasets must be manually downloaded
+and placed in the following directories:
 
     data/raw/mvtec/      <- MVTec AD (15 catégories)
     data/raw/hss-iad/    <- HSS-IAD (7 catégories)
 
-Lancer ensuite le script d'harmonisation depuis la racine du projet
-(via **uv**, qui gère l'environnement et les dépendances) :
+Then run the harmonization script from the project root
+(using **uv**, which manages the environment and dependencies) :
 
     uv run python -m src.data.harmonize
 
-Le script scanne les deux arborescences (structure MVTec-style
-`category/{train,test}/{good,defective,...}`), récupère les masques
-correspondants dans `ground_truth/` et produit deux CSV dans
+The script scans both directory structures (MVTec-style:
+`category/{train,test}/{good,defective,...}`), retrieves the
+corresponding masks from `ground_truth/` and generates two CSV files in
 `data/processed/` :
 
-- `unified_dataset.csv` — une ligne par image avec les colonnes
+- `unified_dataset.csv` -  one row per image with the columns
   `dataset`, `category`, `split`, `label`, `is_anomaly`, `image_path`,
   `mask_path`, `has_mask`.
-- `resolutions_sample.csv` — échantillon de 2000 images avec `width`,
-  `height`, `channels` (utilisé par le notebook EDA).
+- `resolutions_sample.csv` - sample of 2000 images with `width`,
+  `height`, `channels` (used by the EDA notebook).
 
-Tous les chemins et paramètres du scan (extensions d'images, splits,
-label normal, taille d'échantillon, seed) sont centralisés dans
+All paths and scan parameters (image extensions, splits,  
+normal label, sample size, seed) are centralized in  
 [`src/config.py`](src/config.py).
 
-Une fois les CSV générés, ouvrir
+Once the CSV files are generated, open
 [`notebooks/01_eda_harmonisation.ipynb`](notebooks/01_eda_harmonisation.ipynb)
-pour l'analyse exploratoire.
+for exploratory analysis.
 
 --------
-
