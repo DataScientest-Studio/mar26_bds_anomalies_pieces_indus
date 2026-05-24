@@ -1,38 +1,53 @@
-"""Modèles d'anomaly detection : Dinomaly, PatchCore manuel, Ensemble."""
-from src.models.dinomaly_wrapper import (
-    build_dinomaly,
-    ckpt_path,
-    load_dinomaly_ckpt,
-    score_image_manual,
-    score_paths_manual,
+from src.models.pixel_ae import (
+    CustomConstrainedUNetAutoencoder,
+    CustomConvAutoencoder,
+    CustomUNetAutoencoder,
+    PixelAEParams,
+    ResNetReconstructionAutoencoder,
+    build_pixel_autoencoder,
 )
-from src.models.ensemble import (
-    align_heatmaps,
-    baseline_stats,
-    calibrate_bg_subtract,
-    calibrate_dog,
-    calibrate_p99,
-    calibrate_zscore,
-    ensemble_max,
-    ensemble_mean,
-    norm_global_minmax,
+from src.models.feature_ae.models import (
+    build_feature_autoencoder,
+    feature_error_map,
+    feature_reconstruction_loss,
 )
-from src.models.patchcore_manual import PatchCoreManual
+from src.models.segmentation.models import build_segmentation_model
+from src.models.segmentation.runtime import (
+    mask_logits_from_model_output,
+    mask_logits_from_output,
+    model_forward,
+    model_mask_logits,
+    model_output,
+    replace_segmentation_head,
+)
+from src.models.baselines.patchcore import (
+    PatchCoreModel,
+    PatchCoreParams,
+    UnifiedAnomalyDataset,
+    evaluate_predictions,
+    split_category_data,
+)
 
 __all__ = [
-    "build_dinomaly",
-    "ckpt_path",
-    "load_dinomaly_ckpt",
-    "score_paths_manual",
-    "score_image_manual",
-    "PatchCoreManual",
-    "norm_global_minmax",
-    "align_heatmaps",
-    "ensemble_mean",
-    "ensemble_max",
-    "calibrate_bg_subtract",
-    "calibrate_zscore",
-    "calibrate_p99",
-    "calibrate_dog",
-    "baseline_stats",
+    "CustomConvAutoencoder",
+    "CustomConstrainedUNetAutoencoder",
+    "CustomUNetAutoencoder",
+    "PatchCoreModel",
+    "PatchCoreParams",
+    "PixelAEParams",
+    "ResNetReconstructionAutoencoder",
+    "UnifiedAnomalyDataset",
+    "build_feature_autoencoder",
+    "build_segmentation_model",
+    "build_pixel_autoencoder",
+    "evaluate_predictions",
+    "feature_error_map",
+    "feature_reconstruction_loss",
+    "mask_logits_from_model_output",
+    "mask_logits_from_output",
+    "model_forward",
+    "model_mask_logits",
+    "model_output",
+    "replace_segmentation_head",
+    "split_category_data",
 ]

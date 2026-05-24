@@ -20,7 +20,7 @@ st.markdown(
 )
 
 # --- Load CSV ---
-CSV_PATH = PATHS.root / "reports" / "mvtec_dinomaly_patchcore_ensemble.csv"
+CSV_PATH = PATHS.root / "reports" / "ensemble" / "mvtec_dinomaly_patchcore_ensemble.csv"
 if not CSV_PATH.exists():
     st.error(f"CSV absent : `{CSV_PATH.relative_to(PATHS.root)}`")
     st.stop()
@@ -68,7 +68,7 @@ with tab1:
             subset=[f"dino{metric_key}", f"pc{metric_key}", f"mean{metric_key}", f"max{metric_key}"],
             cmap="RdYlGn", vmin=0, vmax=1
         ).format(precision=4),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -100,7 +100,7 @@ with tab2:
         )
         .properties(width=600, height=180)
     )
-    st.altair_chart(chart, use_container_width=False)
+    st.altair_chart(chart, width="content")
 
 # --- Catégories à explorer ---
 st.markdown("---")

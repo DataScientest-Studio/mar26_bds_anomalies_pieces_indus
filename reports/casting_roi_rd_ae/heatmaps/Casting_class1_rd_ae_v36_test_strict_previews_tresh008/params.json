@@ -1,0 +1,17 @@
+{
+  "runs": [
+    [
+      "RD AE V36 calibrated strict",
+      "reports\\casting_roi_rd_ae\\heatmaps\\Casting_class1_rd_ae_v36_test_calibrated\\predictions.npz"
+    ]
+  ],
+  "metrics": {
+    "RD AE V36 calibrated strict": {
+      "image_auroc": 0.868421052631579,
+      "image_ap": 0.9221094070474871,
+      "pixel_auroc": 0.9814090257058937,
+      "pixel_ap": 0.3774971109845798,
+      "pixel_aupimo_1e-5_1e-3": 0.14150347052862744
+    }
+  }
+}

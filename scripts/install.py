@@ -1,21 +1,18 @@
-"""Détecte CUDA et lance uv sync avec le bon extra."""
-import subprocess
-import sys
+﻿"""Print the recommended uv environment setup commands."""
 
-def detect_cuda():
-    try:
-        out = subprocess.check_output(["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
-                                      text=True).strip()
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return "cpu"
-    # Driver → CUDA mapping (règle simplifiée, à ajuster)
-    # Driver >= 570 → cu128, >= 545 → cu124, >= 525 → cu121, sinon cpu
-    version = float(out.split('.')[0])
-    if version >= 570: return "cu128"
-    if version >= 545: return "cu124"
-    if version >= 525: return "cu121"
-    return "cpu"
+from __future__ import annotations
 
-extra = detect_cuda()
-print(f"Detected {extra}")
-subprocess.run(["uv", "sync", "--extra", extra], check=True)
+
+def main() -> None:
+    print("Recommended environment setup:")
+    print("  uv sync --extra cu128   # CUDA 12.8 workstation")
+    print("  uv sync --extra cu124   # CUDA 12.4 workstation")
+    print("  uv sync --extra cu121   # CUDA 12.1 workstation")
+    print("  uv sync --extra cpu     # CPU-only environment")
+    print()
+    print("Then run commands with, for example:")
+    print("  uv run --extra cu128 python -m pytest tests -q")
+
+
+if __name__ == "__main__":
+    main()

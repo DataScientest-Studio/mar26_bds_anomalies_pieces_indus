@@ -1,0 +1,2 @@
+layer_weights,w_layer2,w_layer3,smoothing,roi_mode,roi_threshold,topk_fraction,image_auroc,image_ap,pixel_auroc,pixel_ap,pixel_aupimo_1e-5_1e-3
+"layer2=0.65,layer3=0.35",0.65,0.35,median3,soft_map,0.5,0.005,0.868421052631579,0.9221094070474871,0.9814090257058937,0.3774971109845798,0.14150347052862744

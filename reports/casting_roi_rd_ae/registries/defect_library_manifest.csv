@@ -1,0 +1,5 @@
+﻿"asset","path","git_visible","status","file_count","size_bytes","role","lineage"
+"build_defect_library","src/features/synthetic_defects/build_library.py","True","active_src_backend","1","7771","Backend public pour entrypoint build-defect-library","extraction defauts reels C1/C2/C3 -> patch library"
+"preview_synthetic_defects","src/features/synthetic_defects/preview.py","True","active_src_backend","1","11378","Backend public pour entrypoint preview-synthetic-defects","synthese v4/v5 -> previews contextualisees"
+"diagnose_synthetic_defects","src/features/synthetic_defects/diagnostics.py","True","active_src_backend","1","151","Backend public pour entrypoint diagnose-synthetic-defects","diagnostic real-vs-synth final"
+

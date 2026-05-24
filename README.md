@@ -13,13 +13,16 @@ Project Organization
     ├── requirements.txt           <- Pip requirements to reproduce the analysis environment.
     ├── uv.lock                    <- Locked dependency versions (uv).
     │
+    ├── app                        <- Streamlit demo application.
+    │   ├── main.py
+    │   └── pages                  <- Live inference, benchmarks, Casting_class1.
+    │
     ├── data                       <- Datasets (local only, excluded from Git).
     │   ├── raw                    <- Original, immutable data dump.
     │   │   ├── mvtec              <- MVTec AD (15 categories).
     │   │   └── hss-iad            <- HSS-IAD (7 categories).
-    │   └── processed              <- Harmonized data ready for use.
-    │       ├── unified_dataset.csv
-    │       └── resolutions_sample.csv
+    │   ├── processed              <- Harmonized data and curated masks.
+    │   └── classified             <- Classified subsets used by experiments.
     │
     ├── models                     <- Trained models, predictions, checkpoints.
     │
@@ -28,10 +31,18 @@ Project Organization
     │
     ├── references                 <- Documentation, links, research papers (e.g., HSS-IAD).
     │
-    ├── reports                    <- Reports generated from analyses.
-    │   ├── eda_report.md
-    │   └── figures
-    │       └── eda                <- Figures extracted from the EDA notebook.
+    ├── reports                    <- Reports, figures, manifests and experiment outputs.
+    │   ├── baselines
+    │   ├── casting_roi_rd_ae      <- Casting_class1 ROI + RD/Feature-AE documentation.
+    │   ├── casting_surface_features
+    │   ├── dinomaly
+    │   ├── ensemble
+    │   ├── figures                <- Presentation and analysis figures.
+    │   ├── patchcore
+    │   ├── registries
+    │   └── tables
+    │
+    ├── scripts                    <- Utility scripts, dataset lineage and download helpers.
     │
     └── src                        <- Project source code (Python package).
         ├── __init__.py
@@ -41,10 +52,18 @@ Project Organization
         │   ├── __init__.py
         │   └── harmonize.py       <- MVTec AD + HSS-IAD harmonization → unified CSV.
         │
-        ├── features               <- (coming soon) feature extraction.
-        ├── models                 <- (coming soon) training and prediction.
-        ├── visualization          <- (coming soon) visualizations.
-        └── streamlit              <- (coming soon) demo application.
+        ├── features               <- Preprocessing, ROI tools and synthetic defects.
+        ├── inference              <- Inference pipelines used by the demo application.
+        ├── models                 <- Training, evaluation and model wrappers.
+        │   ├── baselines
+        │   ├── dinomaly
+        │   ├── ensemble
+        │   ├── feature_ae         <- RD/Feature-AE pipeline.
+        │   ├── patchcore
+        │   ├── pixel_ae
+        │   └── segmentation       <- Functional-surface ROI segmentation.
+        ├── reporting              <- Shared report paths and manifests.
+        └── visualization          <- Overlays, previews and heatmaps.
 
 Data Harmonization
 -------------------------
@@ -80,3 +99,47 @@ Once the CSV files are generated, open
 for exploratory analysis.
 
 --------
+
+Application
+-------------------------
+
+The project includes a Streamlit demo application with pages for MVTec
+benchmarking, live inference, and the specialized `Casting_class1` inspection
+pipeline.
+
+Streamlit can be launched from the project root with:
+
+    uv run --extra cu128 streamlit run app/main.py
+
+or, with an already-created virtual environment:
+
+    .\.venv\Scripts\python.exe -m streamlit run app\main.py
+
+Command-Line Pipelines
+-------------------------
+
+The main command-line entry points are exposed in `pyproject.toml`:
+
+    uv run --extra cu128 train-roi --help
+    uv run --extra cu128 predict-roi --help
+    uv run --extra cu128 train-rd-ae --help
+    uv run --extra cu128 evaluate-rd-ae --help
+    uv run --extra cu128 calibrate-rd-ae --help
+    uv run --extra cu128 materialize-quality-heatmaps --help
+
+Casting_class1 Inspection Pipeline
+-------------------------
+
+The `Casting_class1` retained path combines:
+
+- functional-surface ROI segmentation;
+- RD/Feature-AE anomaly scoring;
+- post-hoc soft ROI calibration;
+- business decision thresholds: good / to review / defective.
+
+Reference documentation:
+
+- [`reports/casting_roi_rd_ae/README.md`](reports/casting_roi_rd_ae/README.md)
+- [`reports/casting_roi_rd_ae/DATASCIENCE_PIPELINE.md`](reports/casting_roi_rd_ae/DATASCIENCE_PIPELINE.md)
+- [`reports/casting_roi_rd_ae/DATASET_MASKS_AND_SYNTHETIC_DEFECTS.md`](reports/casting_roi_rd_ae/DATASET_MASKS_AND_SYNTHETIC_DEFECTS.md)
+- [`reports/casting_roi_rd_ae/registries/selected_models.md`](reports/casting_roi_rd_ae/registries/selected_models.md)

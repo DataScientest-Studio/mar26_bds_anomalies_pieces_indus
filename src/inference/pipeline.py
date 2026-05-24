@@ -1,7 +1,7 @@
-"""Pipeline d'inférence haut-niveau pour Streamlit / scripts.
+﻿"""Pipeline d'infÃ©rence haut-niveau pour Streamlit / scripts.
 
-Charge les modèles (cache via attribut), fait la prédiction sur une image,
-retourne heatmap + score + overlay prêt à afficher.
+Charge les modÃ¨les (cache via attribut), fait la prÃ©diction sur une image,
+retourne heatmap + score + overlay prÃªt Ã  afficher.
 
 Usage type :
     pipe = AnomalyPipeline.from_category('cable', model_name='ensemble_mean')
@@ -20,38 +20,38 @@ from PIL import Image
 from skimage.transform import resize as sk_resize
 
 from src.config import PATHS
-from src.models.dinomaly_wrapper import (
+from src.models.dinomaly.wrapper import (
     IMG_SIZE_DEFAULT,
     load_dinomaly_ckpt,
     score_image_manual,
     score_paths_manual,
 )
-from src.models.ensemble import (
+from src.models.ensemble.heatmap_fusion import (
     ensemble_max,
     ensemble_mean,
     norm_global_minmax,
 )
-from src.models.patchcore_manual import IMG_SIZE_DEFAULT as PC_IMG_SIZE_DEFAULT
-from src.models.patchcore_manual import PatchCoreManual
+from src.models.patchcore.manual import IMG_SIZE_DEFAULT as PC_IMG_SIZE_DEFAULT
+from src.models.patchcore.manual import PatchCoreManual
 
 ModelName = Literal["dinomaly", "patchcore", "ensemble_mean", "ensemble_max"]
 
 
 @dataclass
 class PredictionResult:
-    """Résultat d'une inférence sur une image."""
+    """RÃ©sultat d'une infÃ©rence sur une image."""
 
-    score: float  # score image-level (max de la heatmap normalisée)
-    heatmap: np.ndarray  # (H, W) float32 — heatmap brute du modèle choisi
-    heatmap_norm: np.ndarray  # (H, W) float32 — heatmap normalisée global-minmax [0,1]
-    overlay: np.ndarray  # (H, W, 4) uint8 — heatmap colormap jet + alpha, prête à display
-    image_resized: np.ndarray  # (H, W, 3) uint8 — image originale resize à la heatmap shape
+    score: float  # score image-level (max de la heatmap normalisÃ©e)
+    heatmap: np.ndarray  # (H, W) float32 â€” heatmap brute du modÃ¨le choisi
+    heatmap_norm: np.ndarray  # (H, W) float32 â€” heatmap normalisÃ©e global-minmax [0,1]
+    overlay: np.ndarray  # (H, W, 4) uint8 â€” heatmap colormap jet + alpha, prÃªte Ã  display
+    image_resized: np.ndarray  # (H, W, 3) uint8 â€” image originale resize Ã  la heatmap shape
     model_name: str
     category: str
 
 
 def _to_jet_overlay(heatmap_norm: np.ndarray) -> np.ndarray:
-    """Convertit une heatmap normalisée [0,1] en RGBA uint8 colormap jet."""
+    """Convertit une heatmap normalisÃ©e [0,1] en RGBA uint8 colormap jet."""
     import matplotlib.cm as cm
 
     cmap = cm.get_cmap("jet")
@@ -60,10 +60,10 @@ def _to_jet_overlay(heatmap_norm: np.ndarray) -> np.ndarray:
 
 
 class AnomalyPipeline:
-    """Pipeline unifié Dinomaly / PatchCore / Ensemble pour une catégorie donnée.
+    """Pipeline unifiÃ© Dinomaly / PatchCore / Ensemble pour une catÃ©gorie donnÃ©e.
 
-    Construction lente (chargement ckpt + memory bank), prédiction rapide.
-    Cache à utiliser via Streamlit `@st.cache_resource`.
+    Construction lente (chargement ckpt + memory bank), prÃ©diction rapide.
+    Cache Ã  utiliser via Streamlit `@st.cache_resource`.
     """
 
     def __init__(
@@ -83,7 +83,7 @@ class AnomalyPipeline:
 
         self._dino = None
         self._patchcore = None
-        # Stats de référence pour normalisation discriminative (option A)
+        # Stats de rÃ©fÃ©rence pour normalisation discriminative (option A)
         self.dino_min: float | None = None
         self.dino_max: float | None = None
         self.pc_min: float | None = None
@@ -94,28 +94,28 @@ class AnomalyPipeline:
         if not train_dir.exists():
             raise FileNotFoundError(
                 f"Dossier train absent : {train_dir}\n"
-                f"Run scripts/download_data.py au préalable."
+                f"Run scripts/download_data.py au prÃ©alable."
             )
         train_paths = sorted(str(p) for p in train_dir.glob("*.png"))
         if not train_paths:
             train_paths = sorted(str(p) for p in train_dir.glob("*.jpg"))
         calib_paths = train_paths[:n_calib_for_stats]
 
-        # Chargement Dinomaly si nécessaire
+        # Chargement Dinomaly si nÃ©cessaire
         if model_name in ("dinomaly", "ensemble_mean", "ensemble_max"):
             self._dino = load_dinomaly_ckpt(
                 category=category, img_size=dino_img_size, epochs=dino_epochs
             )
-            # Stats de référence : score sur n_calib train good → min/max
+            # Stats de rÃ©fÃ©rence : score sur n_calib train good â†’ min/max
             h_calib_dino = score_paths_manual(
                 self._dino, calib_paths, img_size=dino_img_size, batch_size=4
             )
-            # Max par image puis stats sur les max → reflète la distribution des scores image
+            # Max par image puis stats sur les max â†’ reflÃ¨te la distribution des scores image
             per_image_max = h_calib_dino.reshape(h_calib_dino.shape[0], -1).max(axis=1)
             self.dino_min = float(per_image_max.min())
             self.dino_max = float(per_image_max.max())
 
-        # Construction PatchCore si nécessaire
+        # Construction PatchCore si nÃ©cessaire
         if model_name in ("patchcore", "ensemble_mean", "ensemble_max"):
             self._patchcore = PatchCoreManual(
                 img_size=pc_img_size, coreset_ratio=pc_coreset_ratio
@@ -127,7 +127,7 @@ class AnomalyPipeline:
             self.pc_max = float(per_image_max_pc.max())
 
     def _train_dir(self) -> Path:
-        """Localise le dossier train/good pour la catégorie (MVTec ou HSS-IAD)."""
+        """Localise le dossier train/good pour la catÃ©gorie (MVTec ou HSS-IAD)."""
         mvtec_path = PATHS.mvtec_dir / self.category / "train" / "good"
         if mvtec_path.exists():
             return mvtec_path
@@ -148,7 +148,7 @@ class AnomalyPipeline:
         elif isinstance(image, Image.Image):
             image = image.convert("RGB")
         else:
-            raise TypeError(f"Type non supporté : {type(image)}")
+            raise TypeError(f"Type non supportÃ© : {type(image)}")
 
         h_dino = None
         h_pc = None
@@ -157,24 +157,24 @@ class AnomalyPipeline:
         if self._patchcore is not None:
             h_pc = self._patchcore.score_image(image)
 
-        # --- Normalisation contre les stats de référence (train good baseline) ---
+        # --- Normalisation contre les stats de rÃ©fÃ©rence (train good baseline) ---
         # Score image = (max_heatmap - train_max) / (train_max - train_min)
-        # → 0 si l'image ressemble au train good le plus anomal vu
-        # → > 0 si l'image est plus anomale que le pire train good
-        # Clip à [0, 1] pour usage UI (au-delà de 1 = très anomal mais cap visuel)
+        # â†’ 0 si l'image ressemble au train good le plus anomal vu
+        # â†’ > 0 si l'image est plus anomale que le pire train good
+        # Clip Ã  [0, 1] pour usage UI (au-delÃ  de 1 = trÃ¨s anomal mais cap visuel)
         def normed_score(h_raw, mn, mx):
             if h_raw is None or mn is None or mx is None:
                 return None, None
             raw_max = float(h_raw.max())
             score = (raw_max - mx) / (mx - mn + 1e-8)
-            # Heatmap normalisée pour affichage (référence stats train good)
+            # Heatmap normalisÃ©e pour affichage (rÃ©fÃ©rence stats train good)
             h_norm = (h_raw - mn) / (mx - mn + 1e-8)
             return score, h_norm
 
         score_dino, h_dino_n = normed_score(h_dino, self.dino_min, self.dino_max)
         score_pc, h_pc_n = normed_score(h_pc, self.pc_min, self.pc_max)
 
-        # --- Sélection / combinaison ---
+        # --- SÃ©lection / combinaison ---
         if self.model_name == "dinomaly":
             heatmap = h_dino
             heatmap_norm = h_dino_n
@@ -184,7 +184,7 @@ class AnomalyPipeline:
             heatmap_norm = h_pc_n
             score = score_pc
         else:
-            # Ensemble : normaliser chaque modèle avec ses stats, PUIS combiner
+            # Ensemble : normaliser chaque modÃ¨le avec ses stats, PUIS combiner
             if h_pc_n.shape != h_dino_n.shape:
                 h_pc_n = sk_resize(
                     h_pc_n, h_dino_n.shape, order=1, preserve_range=True, anti_aliasing=True
@@ -194,12 +194,12 @@ class AnomalyPipeline:
             else:  # ensemble_max
                 heatmap_norm = np.maximum(h_dino_n, h_pc_n)
             heatmap = heatmap_norm  # raw n'a plus de sens en ensemble
-            # Score = max de la heatmap combinée (déjà dans une échelle pseudo-[0,1])
+            # Score = max de la heatmap combinÃ©e (dÃ©jÃ  dans une Ã©chelle pseudo-[0,1])
             score = float(heatmap_norm.max())
 
         # Clip pour usage UI [0, 1]
         score_clipped = float(np.clip(score, 0.0, 1.0))
-        # heatmap_norm peut dépasser 1 si défaut très net → clip pour le colormap jet
+        # heatmap_norm peut dÃ©passer 1 si dÃ©faut trÃ¨s net â†’ clip pour le colormap jet
         heatmap_norm_display = np.clip(heatmap_norm, 0.0, 1.0).astype(np.float32)
 
         target_shape = heatmap_norm.shape

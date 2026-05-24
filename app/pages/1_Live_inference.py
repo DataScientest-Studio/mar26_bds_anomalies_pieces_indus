@@ -105,7 +105,7 @@ def mask_to_rgba(mask: np.ndarray, color: tuple = (255, 0, 0)) -> np.ndarray:
 def load_benchmark_csv() -> Optional["pd.DataFrame"]:
     """Charge les métriques benchmark du notebook 08 (AUROC img/pix + AUPIMO pour 15 cat)."""
     import pandas as pd
-    csv_path = PATHS.root / "reports" / "mvtec_dinomaly_patchcore_ensemble.csv"
+    csv_path = PATHS.root / "reports" / "ensemble" / "mvtec_dinomaly_patchcore_ensemble.csv"
     if not csv_path.exists():
         return None
     return pd.read_csv(csv_path)
@@ -157,7 +157,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### Source de l'image")
     source = st.radio(
-        "", ["📁 Upload", "🖼 Galerie d'exemples"], label_visibility="collapsed"
+        "Source de l'image", ["📁 Upload", "🖼 Galerie d'exemples"], label_visibility="collapsed"
     )
 
 # --- Vérification ckpt ----------------------------------------------------
@@ -204,7 +204,7 @@ else:
                 for i, p in enumerate(paths):
                     col = cols[i % len(cols)]
                     with col:
-                        col.image(Image.open(p), use_container_width=True)
+                        col.image(Image.open(p), width="stretch")
                         if col.button(f"Analyser", key=f"btn_{defect_type}_{i}"):
                             selected_path = p
                             selected_image = Image.open(p).convert("RGB")
@@ -230,23 +230,23 @@ if mode == "Single model":
 
     n_cols = 5 if gt_mask is not None else 3
     cols = st.columns(n_cols)
-    cols[0].image(result.image_resized, caption="Image", use_container_width=True)
+    cols[0].image(result.image_resized, caption="Image", width="stretch")
     if gt_mask is not None:
-        cols[1].image(gt_mask, caption="GT mask", use_container_width=True)
+        cols[1].image(gt_mask, caption="GT mask", width="stretch")
         # Overlay GT (red) sur l'image
         gt_rgba = mask_to_rgba(gt_mask)
         gt_overlay = blend_overlay(result.image_resized, gt_rgba, alpha=200)
-        cols[2].image(gt_overlay, caption="GT overlay", use_container_width=True)
-        cols[3].image(result.overlay, caption="Heatmap pred", use_container_width=True)
+        cols[2].image(gt_overlay, caption="GT overlay", width="stretch")
+        cols[3].image(result.overlay, caption="Heatmap pred", width="stretch")
         cols[4].image(
             blend_overlay(result.image_resized, result.overlay),
-            caption="Pred overlay", use_container_width=True,
+            caption="Pred overlay", width="stretch",
         )
     else:
-        cols[1].image(result.overlay, caption="Heatmap pred", use_container_width=True)
+        cols[1].image(result.overlay, caption="Heatmap pred", width="stretch")
         cols[2].image(
             blend_overlay(result.image_resized, result.overlay),
-            caption="Pred overlay", use_container_width=True,
+            caption="Pred overlay", width="stretch",
         )
 
     sc1, sc2, sc3 = st.columns(3)
@@ -310,18 +310,18 @@ else:
     if gt_mask is not None:
         top_cols = st.columns(3)
         top_cols[0].image(ref_result.image_resized, caption=f"Image — {category}",
-                          use_container_width=True)
-        top_cols[1].image(gt_mask, caption="GT mask", use_container_width=True)
+                          width="stretch")
+        top_cols[1].image(gt_mask, caption="GT mask", width="stretch")
         gt_rgba = mask_to_rgba(gt_mask)
         gt_overlay = blend_overlay(ref_result.image_resized, gt_rgba, alpha=200)
         top_cols[2].image(gt_overlay, caption="GT overlay (rouge)",
-                          use_container_width=True)
+                          width="stretch")
     else:
         img_col, _ = st.columns([1, 3])
         img_col.image(
             ref_result.image_resized,
             caption=f"Image — {category}",
-            use_container_width=True,
+            width="stretch",
         )
 
     # 4 colonnes : 1 par modèle
@@ -332,7 +332,7 @@ else:
         col.markdown(f"**{label}**")
         col.image(
             blend_overlay(result.image_resized, result.overlay),
-            use_container_width=True,
+            width="stretch",
         )
         col.metric("Score", f"{result.score:.4f}")
         # AUROC pixel per-image si GT disponible
@@ -360,7 +360,7 @@ else:
         bench_df = pd.DataFrame(rows_table).set_index("Modèle")
         st.dataframe(
             bench_df.style.background_gradient(cmap="RdYlGn", vmin=0, vmax=1).format(precision=4),
-            use_container_width=True,
+            width="stretch",
         )
 
     st.caption(
@@ -387,7 +387,7 @@ else:
         .properties(width=600, height=180)
     )
     st.markdown("#### Scores image-level (normalisés [0, 1] per-image)")
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width="stretch")
 
 # --- Info ground truth si applicable --------------------------------------
 if selected_path:

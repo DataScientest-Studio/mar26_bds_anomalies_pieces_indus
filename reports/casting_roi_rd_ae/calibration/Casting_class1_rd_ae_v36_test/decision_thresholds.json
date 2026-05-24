@@ -1,0 +1,49 @@
+{
+  "source_predictions": "reports/casting_roi_rd_ae/evaluation/Casting_class1/Casting_class1_rd_ae_v36_test/predictions.npz",
+  "roi_predictions_dir": "reports/casting_surface_features/Casting_class1_v36_e28_test_roi_full",
+  "scoring": {
+    "layers": ["layer2", "layer3"],
+    "layer_weights": {"layer2": 0.65, "layer3": 0.35},
+    "smoothing": "median3",
+    "roi_mode": "soft_map",
+    "roi_threshold": 0.5,
+    "topk_fraction": 0.005
+  },
+  "score_distribution": {
+    "good": {
+      "min": 0.3816,
+      "median": 0.4426,
+      "p75": 0.4601,
+      "p90": 0.4857,
+      "p95": 0.4987,
+      "max": 0.5116
+    },
+    "defective": {
+      "min": 0.4263,
+      "p10": 0.4477,
+      "p25": 0.4827,
+      "median": 0.5086,
+      "p75": 0.5362,
+      "p90": 0.5789,
+      "max": 0.6271
+    }
+  },
+  "recommended_thresholds": {
+    "good_if_score_lte": 0.425,
+    "defective_if_score_gte": 0.515,
+    "otherwise": "a_verifier"
+  },
+  "rationale": {
+    "good_threshold": "Largest practical green threshold below the lowest defective score observed in the calibrated test set.",
+    "defective_threshold": "Smallest practical red threshold above the highest good score observed in the calibrated test set.",
+    "yellow_zone": "The score distributions overlap strongly; the intermediate zone is intentionally routed to manual verification."
+  },
+  "test_set_counts_at_recommended_thresholds": {
+    "good_as_green": 4,
+    "defective_as_green": 0,
+    "good_as_yellow": 8,
+    "defective_as_yellow": 11,
+    "good_as_red": 0,
+    "defective_as_red": 8
+  }
+}

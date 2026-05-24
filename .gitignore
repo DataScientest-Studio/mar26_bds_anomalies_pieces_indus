@@ -145,6 +145,18 @@ wandb/
 mlruns/
 outputs/
 
+# Local smoke-test outputs
+.smoke/
+
+# Reproducible heavy report artifacts
+/reports/casting_surface_features/
+/reports/**/predictions.npz
+/reports/**/functional_surface_predictions.npz
+/reports/**/prob_maps/
+/reports/**/score_maps/
+/reports/**/masks/
+/reports/**/per_image/
+
 # OS-specific files
 .DS_Store
 Thumbs.db

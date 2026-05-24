@@ -22,11 +22,27 @@ dependencies = [
     # Computer vision
     "opencv-python>=4.8",
     "umap-learn>=0.5.12",
+    "streamlit>=1.56.0",
 ]
+
+[project.scripts]
+train-roi = "src.models.segmentation.training:main"
+predict-roi = "src.models.segmentation.prediction:main"
+evaluate-roi = "src.models.segmentation.roi_coverage:main"
+build-mask-dataset = "src.data.build_mask_dataset:main"
+build-defect-library = "src.features.synthetic_defects.build_library:main"
+preview-synthetic-defects = "src.features.synthetic_defects.preview:main"
+diagnose-synthetic-defects = "src.features.synthetic_defects.diagnostics:main"
+train-rd-ae = "src.models.feature_ae.training:main"
+evaluate-rd-ae = "src.models.feature_ae.evaluation:main"
+calibrate-rd-ae = "src.models.feature_ae.calibrate_matrix:main"
+materialize-quality-heatmaps = "src.models.feature_ae.materialize:main"
+compare-quality-heatmaps = "src.models.feature_ae.compare_heatmaps:main"
 
 [project.optional-dependencies]
 app = [
     "streamlit>=1.30",
+    "streamlit-drawable-canvas>=0.9",
 ]
 # PyTorch variants — sélection via `uv sync --extra cu121` (ou cu124 / cu128 / cpu).
 # Le bloc [tool.uv.sources] plus bas redirige torch/torchvision vers le bon index PyTorch.
@@ -46,6 +62,14 @@ build-backend = "hatchling.build"
 dev = [
     "ipykernel>=7.2.0",
     "ipywidgets>=8.1.8",
+    "pytest>=9.0.3",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "smoke: end-to-end pipeline smoke tests",
+    "cuda: tests requiring CUDA",
+    "slow: longer-running validation tests",
 ]
 
 # ---------------------------------------------------------------------------
