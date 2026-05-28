@@ -24,7 +24,7 @@ st.set_page_config(
 # --- Header ---
 st.title("🔍 Industrial Anomaly Detection")
 st.markdown(
-    "**Portfolio ML Engineer · MVTec AD + HSS-IAD · Ensemble Dinomaly + PatchCore**"
+    "**ML Engineer · Anomaly Detection · MVTec AD + HSS-IAD ·**"
 )
 st.markdown("---")
 
@@ -43,7 +43,7 @@ st.markdown(
 ## Le projet
 
 Détection d'anomalies sur pièces industrielles (MVTec AD + HSS-IAD).
-On part de **PaDiM from-scratch** (~0.30 AUPIMO) et on construit pas à pas un
+On part de **PatchCore from-scratch** (~0.30 AUPIMO) et on construit pas à pas un
 **baseline ensemble** atteignant **0.843 AUPIMO** sur 15 catégories MVTec —
 à portée du SOTA Dinomaly 2024 (~0.86).
 
@@ -74,21 +74,15 @@ st.code(
 
 st.markdown(
     """
-## Navigation
-
-- **🔍 Live inference** — Drag-drop une image ou choisis dans la galerie d'exemples.
-- **📊 Benchmark** — Tableau interactif des 15 catégories : Dinomaly seul, PatchCore seul, Ensemble Mean / Max.
-- **📖 Journey** — L'histoire complète du projet : 6 succès + 4 études négatives.
-
 ## Stack
 - Python 3.12 · uv (multi-CUDA) · PyTorch 2.11 CUDA 12.8
 - anomalib 2.3.1 · DINOv2-B (Meta) · WideResNet50_2 (ImageNet)
 - Streamlit · Matplotlib · scikit-learn
 
 ## Code & ressources
-- Repo : [github.com/Missipsa06/...](https://github.com/Missipsa06)
-- Journey complet : `reports/mvtec_journey.md`
-- Notebooks : `notebooks/01_eda` → `12_hazelnut_improvements`
+- Repo : [github.com/DataScientest-Studio/...](https://github.com/DataScientest-Studio/mar26_bds_anomalies_pieces_indus)
+- Dataset MVTec AD : [mvtec.com](https://www.mvtec.com/company/research/datasets/mvtec-ad)
+- Dataset HSS-IAD : [hss-iad.com](https://hss-iad.com/dataset)
 """
 )
 
@@ -96,10 +90,8 @@ st.markdown(
 st.sidebar.markdown("### À propos")
 st.sidebar.markdown(
     """
-**Missipsa BENDJOUDI** · 2026
-Portfolio ML Engineer
+2026 · ML Engineer
 
-Co-réalisé avec des collègues.
 """
 )
 st.sidebar.markdown("---")

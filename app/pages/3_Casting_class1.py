@@ -216,35 +216,7 @@ with right:
         st.image(str(img), caption="Calibration soft ROI, sans masque ROI apparent")
     else:
         st.info(f"Figure absente : {img}")
-
-st.markdown("---")
-st.subheader("Historique métrique")
-if METRICS_CSV.exists():
-    df = pd.read_csv(METRICS_CSV)
-    metric_cols = [
-        "phase_order",
-        "stage",
-        "method",
-        "image_auroc",
-        "image_ap",
-        "pixel_auroc",
-        "pixel_ap",
-        "aupimo",
-        "primary_metric",
-        "story_decision",
-    ]
-    existing_cols = [c for c in metric_cols if c in df.columns]
-    st.dataframe(df[existing_cols], width="stretch", height=360)
-else:
-    st.info(f"CSV absent : {METRICS_CSV}")
-
-st.subheader("Gains entre jalons")
-if GAINS_CSV.exists():
-    gains = pd.read_csv(GAINS_CSV)
-    st.dataframe(gains, width="stretch", height=300)
-else:
-    st.info(f"CSV absent : {GAINS_CSV}")
-
+        
 st.markdown("---")
 st.caption(
     "Les poids restent locaux et sont documentés par manifest. "

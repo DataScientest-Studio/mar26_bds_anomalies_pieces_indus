@@ -69,6 +69,27 @@ def blend_overlay(image_resized: np.ndarray, overlay_rgba: np.ndarray, alpha: in
     return Image.alpha_composite(base, overlay)
 
 
+def defect_only_overlay(
+    image_resized: np.ndarray,
+    heatmap_norm: np.ndarray,
+    threshold: float = 0.4,
+    max_alpha: int = 210,
+) -> Image.Image:
+    """Superpose UNIQUEMENT les régions de défaut sur l'image.
+
+    Les pixels dont `heatmap_norm` < `threshold` restent totalement transparents
+    (image originale visible tel quel). Au-delà du seuil, l'opacité monte
+    linéairement avec l'intensité jusqu'à `max_alpha`.
+    """
+    import matplotlib.cm as cm
+    cmap = cm.get_cmap("jet")
+    rgba = (cmap(np.clip(heatmap_norm, 0, 1)) * 255).astype(np.uint8)
+    above = np.clip(heatmap_norm - threshold, 0.0, 1.0) / max(1.0 - threshold, 1e-6)
+    rgba[..., 3] = (above * max_alpha).astype(np.uint8)
+    base = Image.fromarray(image_resized).convert("RGBA")
+    return Image.alpha_composite(base, Image.fromarray(rgba))
+
+
 def load_gt_mask(test_path: str | Path, target_shape: tuple[int, int]) -> Optional[np.ndarray]:
     """Charge le ground truth mask pour une image test MVTec.
 
@@ -111,6 +132,37 @@ def load_benchmark_csv() -> Optional["pd.DataFrame"]:
     return pd.read_csv(csv_path)
 
 
+@st.cache_data
+def load_calibrated_thresholds() -> dict[tuple[str, str], tuple[float, float, float]]:
+    """Charge les seuils calibrés sur test set MVTec → {(category, model): (good, defect, auroc)}.
+
+    CSV produit par `scripts/calibrate_thresholds.py`.
+    """
+    csv_path = PATHS.root / "reports" / "calibration" / "mvtec_thresholds.csv"
+    if not csv_path.exists():
+        return {}
+    import pandas as pd
+    df = pd.read_csv(csv_path)
+    return {
+        (row["category"], row["model"]): (
+            float(row["threshold_good"]),
+            float(row["threshold_defect"]),
+            float(row["auroc"]),
+        )
+        for _, row in df.iterrows()
+    }
+
+
+def get_default_thresholds(category: str, model_name: str) -> tuple[float, float, Optional[float]]:
+    """Retourne (good_default, defect_default, auroc) — auroc=None si non calibré."""
+    cal = load_calibrated_thresholds()
+    if (category, model_name) in cal:
+        g, d, auroc = cal[(category, model_name)]
+        # Clip aux ranges des sliders ci-dessous
+        return max(0.05, min(0.50, g)), max(0.40, min(0.95, d)), auroc
+    return 0.30, 0.60, None
+
+
 # Mapping interne model_name → préfixe CSV
 MODEL_TO_PREFIX = {
     "dinomaly": "dino",
@@ -118,6 +170,38 @@ MODEL_TO_PREFIX = {
     "ensemble_mean": "mean",
     "ensemble_max": "max",
 }
+
+
+def classify_anomaly_score(
+    score: float, good_threshold: float, defect_threshold: float
+) -> tuple[str, str, str]:
+    """3 classes inspirées de la page Casting_class1 : bonne / à vérifier / défectueuse."""
+    if score <= good_threshold:
+        confidence = min(1.0, (good_threshold - score) / max(good_threshold, 1e-6))
+        return "Pièce bonne", "#17823b", f"Confiance bonne {100 * confidence:.0f}%"
+    if score >= defect_threshold:
+        confidence = min(1.0, (score - defect_threshold) / max(1.0 - defect_threshold, 1e-6))
+        return "Pièce défectueuse", "#b42318", f"Confiance défaut {100 * confidence:.0f}%"
+    span = max(defect_threshold - good_threshold, 1e-6)
+    center = (good_threshold + defect_threshold) / 2.0
+    ambiguity = 1.0 - min(1.0, abs(score - center) / (span / 2.0))
+    return "À vérifier", "#b7791f", f"Zone mitigée {100 * ambiguity:.0f}%"
+
+
+def render_decision_badge(score: float, good_threshold: float, defect_threshold: float) -> None:
+    label, color, conf = classify_anomaly_score(score, good_threshold, defect_threshold)
+    st.markdown(
+        f"""
+        <div style="border-left: 10px solid {color}; background: {color}18;
+                    padding: 0.85rem 1rem; border-radius: 0.35rem; margin: 0.5rem 0 0.75rem 0;">
+            <div style="font-size: 1.4rem; font-weight: 750; color: {color};">{label}</div>
+            <div style="font-size: 0.95rem; color: #2f3b4a;">
+                Score {score:.4f} · bon ≤ {good_threshold:.2f} · défectueux ≥ {defect_threshold:.2f} · {conf}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def per_image_auroc_pixel(heatmap: np.ndarray, gt_mask: np.ndarray) -> Optional[float]:
@@ -154,6 +238,33 @@ with st.sidebar:
     else:
         model_display = "Compare"
         model_name = None
+    st.markdown("---")
+    # Seuils pré-remplis depuis la calibration test set MVTec (si disponible).
+    th_model = model_name if mode == "Single model" else "ensemble_mean"
+    default_good, default_defect, auroc_calib = get_default_thresholds(category, th_model)
+    with st.expander("Décision anomalie", expanded=True):
+        if auroc_calib is not None:
+            st.caption(
+                f"✓ Seuils calibrés sur test MVTec — `{th_model}` AUROC={auroc_calib:.3f} "
+                f"(p90 good / p10 défectueux)."
+            )
+        else:
+            st.caption(
+                "Seuils par défaut (non calibrés pour cette catégorie). "
+                "Lancer `scripts/calibrate_thresholds.py` pour activer la calibration."
+            )
+        good_threshold = st.slider(
+            "Bon si score ≤", 0.05, 0.50, default_good, 0.01,
+            key=f"good_thr_{category}_{th_model}",
+        )
+        defect_threshold = st.slider(
+            "Défectueux si score ≥", 0.40, 0.95, default_defect, 0.01,
+            key=f"defect_thr_{category}_{th_model}",
+        )
+        if defect_threshold <= good_threshold:
+            st.warning("Le seuil défaut doit être strictement supérieur au seuil bon.")
+            defect_threshold = good_threshold + 0.01
+
     st.markdown("---")
     st.markdown("### Source de l'image")
     source = st.radio(
@@ -228,34 +339,32 @@ if mode == "Single model":
     if selected_path is not None:
         gt_mask = load_gt_mask(selected_path, result.heatmap.shape)
 
-    n_cols = 5 if gt_mask is not None else 3
+    n_cols = 3 if gt_mask is not None else 2
     cols = st.columns(n_cols)
     cols[0].image(result.image_resized, caption="Image", width="stretch")
     if gt_mask is not None:
-        cols[1].image(gt_mask, caption="GT mask", width="stretch")
-        # Overlay GT (red) sur l'image
         gt_rgba = mask_to_rgba(gt_mask)
         gt_overlay = blend_overlay(result.image_resized, gt_rgba, alpha=200)
-        cols[2].image(gt_overlay, caption="GT overlay", width="stretch")
-        cols[3].image(result.overlay, caption="Heatmap pred", width="stretch")
-        cols[4].image(
-            blend_overlay(result.image_resized, result.overlay),
+        cols[1].image(gt_overlay, caption="GT overlay", width="stretch")
+        cols[2].image(
+            defect_only_overlay(result.image_resized, result.heatmap_norm),
             caption="Pred overlay", width="stretch",
         )
     else:
-        cols[1].image(result.overlay, caption="Heatmap pred", width="stretch")
-        cols[2].image(
-            blend_overlay(result.image_resized, result.overlay),
+        cols[1].image(
+            defect_only_overlay(result.image_resized, result.heatmap_norm),
             caption="Pred overlay", width="stretch",
         )
 
     sc1, sc2, sc3 = st.columns(3)
     sc1.metric(
         "Score anomalie [0, 1]", f"{result.score:.4f}",
-        help="Normalisé contre 20 images train good. 0 = image ressemble au pire good vu pendant le fit. 1 = bien plus anomal que tout le train good.",
+        help="Max après lissage médian 3×3, normalisé contre 100 train good. 0 = image ressemble au pire good vu pendant le fit. 1 = bien plus anomal que tout le train good.",
     )
     sc2.metric("Modèle", model_display)
     sc3.metric("Catégorie", category)
+
+    render_decision_badge(result.score, good_threshold, defect_threshold)
 
     # --- AUROC pixel sur CETTE image (si GT dispo) ---
     if gt_mask is not None and gt_mask.sum() > 0:
@@ -283,7 +392,7 @@ if mode == "Single model":
                   help="Per-Image Overlap au FPR ultra-bas [1e-5, 1e-4].")
 
     st.caption(
-        "ℹ️ **Score anomalie [0, 1]** : normalisé contre 20 train good au chargement du modèle. "
+        "ℹ️ **Score anomalie [0, 1]** : normalisé contre 100 train good au chargement du modèle. "
         "Une image good est proche de 0, une defective bien au-dessus. "
         "**AUROC/AUPIMO benchmark** = métriques pré-calculées sur le test set MVTec (notebook 08). "
         "**AUROC pixel sur cette image** = score local de localisation (vs GT mask)."
@@ -293,12 +402,13 @@ if mode == "Single model":
 else:
     st.subheader(f"Comparaison 4 modèles — `{category}`")
 
-    pipes = {}
-    results = {}
-    for label, mn in MODEL_OPTIONS.items():
-        with st.spinner(f"Inférence {label}…"):
-            pipes[label] = get_pipeline(category=category, model_name=mn)
-            results[label] = pipes[label].predict(selected_image)
+    # Une seule pipeline (ensemble_mean charge Dinomaly + PatchCore), puis
+    # predict_all_modes réutilise les heatmaps pour produire les 4 résultats.
+    # ~3× plus rapide que 4 appels predict() séparés.
+    pipe = get_pipeline(category=category, model_name="ensemble_mean")
+    with st.spinner("Inférence 4 modèles…"):
+        raw_results = pipe.predict_all_modes(selected_image)
+    results = {label: raw_results[mn] for label, mn in MODEL_OPTIONS.items()}
 
     # Tente de charger le GT mask
     ref_result = results["Ensemble Mean"]
@@ -306,15 +416,14 @@ else:
     if selected_path is not None:
         gt_mask = load_gt_mask(selected_path, ref_result.heatmap.shape)
 
-    # Image originale + GT mask (si dispo) en haut
+    # Image originale + GT overlay (si dispo) en haut
     if gt_mask is not None:
-        top_cols = st.columns(3)
+        top_cols = st.columns(2)
         top_cols[0].image(ref_result.image_resized, caption=f"Image — {category}",
                           width="stretch")
-        top_cols[1].image(gt_mask, caption="GT mask", width="stretch")
         gt_rgba = mask_to_rgba(gt_mask)
         gt_overlay = blend_overlay(ref_result.image_resized, gt_rgba, alpha=200)
-        top_cols[2].image(gt_overlay, caption="GT overlay (rouge)",
+        top_cols[1].image(gt_overlay, caption="GT overlay (rouge)",
                           width="stretch")
     else:
         img_col, _ = st.columns([1, 3])
@@ -331,7 +440,7 @@ else:
     for col, (label, result) in zip(cols, results.items()):
         col.markdown(f"**{label}**")
         col.image(
-            blend_overlay(result.image_resized, result.overlay),
+            defect_only_overlay(result.image_resized, result.heatmap_norm),
             width="stretch",
         )
         col.metric("Score", f"{result.score:.4f}")
@@ -341,6 +450,11 @@ else:
             if auroc is not None:
                 per_image_aurocs[label] = auroc
                 col.metric("AUROC pix (image)", f"{auroc:.4f}")
+
+    st.markdown("#### Décision (basée sur Ensemble Mean)")
+    render_decision_badge(
+        results["Ensemble Mean"].score, good_threshold, defect_threshold
+    )
 
     # --- Tableau benchmark 4 modèles pour cette catégorie ---
     bench = load_benchmark_csv()
@@ -364,7 +478,7 @@ else:
         )
 
     st.caption(
-        "ℹ️ **Score [0, 1]** : normalisé contre 20 train good. Désormais comparable entre modèles. "
+        "ℹ️ **Score [0, 1]** : normalisé contre 100 train good. Désormais comparable entre modèles. "
         "**AUROC pix (image)** = qualité de localisation sur cette image (si GT dispo). "
         "**Benchmark dataset-level** = métriques pré-calculées sur l'ensemble du test set MVTec (notebook 08)."
     )
