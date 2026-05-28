@@ -212,10 +212,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-app = [
-    { name = "streamlit" },
-    { name = "streamlit-drawable-canvas" },
-]
 cpu = [
     { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra == 'extra-22-anomalies-pieces-indus-cpu') or (extra == 'extra-22-anomalies-pieces-indus-cpu' and extra == 'extra-22-anomalies-pieces-indus-cu121') or (extra == 'extra-22-anomalies-pieces-indus-cpu' and extra == 'extra-22-anomalies-pieces-indus-cu124') or (extra == 'extra-22-anomalies-pieces-indus-cpu' and extra == 'extra-22-anomalies-pieces-indus-cu128') or (extra == 'extra-22-anomalies-pieces-indus-cu121' and extra == 'extra-22-anomalies-pieces-indus-cu124') or (extra == 'extra-22-anomalies-pieces-indus-cu121' and extra == 'extra-22-anomalies-pieces-indus-cu128') or (extra == 'extra-22-anomalies-pieces-indus-cu124' and extra == 'extra-22-anomalies-pieces-indus-cu128')" },
     { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'extra-22-anomalies-pieces-indus-cpu') or (extra == 'extra-22-anomalies-pieces-indus-cpu' and extra == 'extra-22-anomalies-pieces-indus-cu121') or (extra == 'extra-22-anomalies-pieces-indus-cpu' and extra == 'extra-22-anomalies-pieces-indus-cu124') or (extra == 'extra-22-anomalies-pieces-indus-cpu' and extra == 'extra-22-anomalies-pieces-indus-cu128') or (extra == 'extra-22-anomalies-pieces-indus-cu121' and extra == 'extra-22-anomalies-pieces-indus-cu124') or (extra == 'extra-22-anomalies-pieces-indus-cu121' and extra == 'extra-22-anomalies-pieces-indus-cu128') or (extra == 'extra-22-anomalies-pieces-indus-cu124' and extra == 'extra-22-anomalies-pieces-indus-cu128')" },
@@ -255,8 +251,6 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.11" },
     { name = "seaborn", specifier = ">=0.13" },
     { name = "streamlit", specifier = ">=1.56.0" },
-    { name = "streamlit", marker = "extra == 'app'", specifier = ">=1.30" },
-    { name = "streamlit-drawable-canvas", marker = "extra == 'app'", specifier = ">=0.9" },
     { name = "timm", specifier = ">=1.0" },
     { name = "torch", specifier = ">=2.1" },
     { name = "torch", marker = "extra == 'cpu'", specifier = ">=2.1", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "anomalies-pieces-indus", extra = "cpu" } },
@@ -270,7 +264,7 @@ requires-dist = [
     { name = "torchvision", marker = "extra == 'cu128'", specifier = ">=0.16", index = "https://download.pytorch.org/whl/cu128", conflict = { package = "anomalies-pieces-indus", extra = "cu128" } },
     { name = "umap-learn", specifier = ">=0.5.12" },
 ]
-provides-extras = ["app", "cpu", "cu121", "cu124", "cu128"]
+provides-extras = ["cpu", "cu121", "cu124", "cu128"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -3472,20 +3466,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/03/85/7c669b3a1336d34ef39fa9760fbd343185f3b15db2ad0838fd78423d1c7f/streamlit-1.56.0.tar.gz", hash = "sha256:1176acfa89ae1318b79078e8efe689a9d02e8d58e325c00fc0e55fa2f3fe8d6a", size = 8559239, upload-time = "2026-03-31T22:29:38.59Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e4/91/cb6f13a89e376ef179309d74f37a70ea0041d5e4b5ba5c4836dbf6e020ad/streamlit-1.56.0-py3-none-any.whl", hash = "sha256:8677a335734a30a51bc57ad0ec910e365d95f7c456fc02c60032927cd0729dc5", size = 9052089, upload-time = "2026-03-31T22:29:36.342Z" },
-]
-
-[[package]]
-name = "streamlit-drawable-canvas"
-version = "0.9.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "pillow" },
-    { name = "streamlit" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/07/fe/69768e7391587b97ef5c503c263bdf960e21f20c02c6b17427a8963af0c6/streamlit-drawable-canvas-0.9.3.tar.gz", hash = "sha256:a31e581bfd63545ecbca71bc3286c09f0542e4199109d33f56392345996802f5", size = 1158330, upload-time = "2023-06-05T17:16:20.755Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/87/bc94460ec77d824735da56fe8e321baf0692595c2a8a90b55f6908a5edc4/streamlit_drawable_canvas-0.9.3-py3-none-any.whl", hash = "sha256:fbb5e29017d359d5438e327ca0a64d0b337a9f2e1f999cd7593baa5bb8a27c25", size = 1169097, upload-time = "2023-06-05T17:16:18.167Z" },
 ]
 
 [[package]]

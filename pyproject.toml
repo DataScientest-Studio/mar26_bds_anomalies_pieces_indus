@@ -40,12 +40,10 @@ materialize-quality-heatmaps = "src.models.feature_ae.materialize:main"
 compare-quality-heatmaps = "src.models.feature_ae.compare_heatmaps:main"
 
 [project.optional-dependencies]
-app = [
-    "streamlit>=1.30",
-    "streamlit-drawable-canvas>=0.9",
-]
 # PyTorch variants — sélection via `uv sync --extra cu121` (ou cu124 / cu128 / cpu).
 # Le bloc [tool.uv.sources] plus bas redirige torch/torchvision vers le bon index PyTorch.
+# IMPORTANT : un extra CUDA doit toujours être sélectionné (ex. `uv run --extra cu128 ...`)
+# sinon uv re-synchronise l'env à chaque appel et réinstalle torch.
 cpu = ["torch>=2.1", "torchvision>=0.16"]
 cu121 = ["torch>=2.1", "torchvision>=0.16"]
 cu124 = ["torch>=2.1", "torchvision>=0.16"]
