@@ -1,4 +1,4 @@
-﻿"""Casting_class1 ROI + RD AE restitution page.
+"""Casting_class1 ROI + RD AE restitution page.
 
 This page is intentionally lightweight: it reads prepared CSVs and figures, and
 it does not run heavy model inference.
@@ -20,6 +20,10 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.inference.casting_feature_ae import CastingFeatureAEPipeline
 
+# Cache partagé : main.py pré-charge via _shared.get_casting_pipeline().
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _shared import get_casting_pipeline  # noqa: E402
+
 REPORT_DIR = PROJECT_ROOT / "reports" / "casting_roi_rd_ae"
 METRICS_CSV = REPORT_DIR / "metrics" / "casting_class1_metric_history_for_soutenance.csv"
 GAINS_CSV = REPORT_DIR / "metrics" / "casting_class1_metric_milestone_gains_for_soutenance.csv"
@@ -27,7 +31,7 @@ HEATMAP_DIR = REPORT_DIR / "heatmaps" / "quality_heatmaps_thresholded"
 BLUE_ORANGE_DIR = REPORT_DIR / "heatmaps" / "blue_orange_quality_heatmaps"
 TEST_DIR = PROJECT_ROOT / "data" / "raw" / "hss-iad" / "Casting_class1" / "test"
 
-st.set_page_config(page_title="Casting_class1", layout="wide")
+st.set_page_config(page_title="HSS-IAD", layout="wide")
 
 
 def classify_anomaly_score(score: float, good_threshold: float, defect_threshold: float) -> tuple[str, str, str]:
@@ -42,7 +46,7 @@ def classify_anomaly_score(score: float, good_threshold: float, defect_threshold
     ambiguity = 1.0 - min(1.0, abs(score - center) / (span / 2.0))
     return "À vérifier", "#b7791f", f"Zone mitigée {100 * ambiguity:.0f}%"
 
-st.title("Casting_class1 - ROI + RD AE")
+st.title("HSS-IAD - Casting_class1 · ROI + RD AE")
 st.markdown(
     "Configuration finale de notre piste spécialisée Casting_class1 : "
     "segmentation de surface fonctionnelle, Reverse Distillation AE, calibration "
@@ -56,11 +60,6 @@ cols[2].metric("AUPIMO", "0.1415", help="Faible taux de faux positifs")
 cols[3].metric("Seuil preview", "0.35", help="Rendu ajustable dans l'app")
 
 st.markdown("---")
-
-
-@st.cache_resource(show_spinner="Chargement ROI + RD AE...")
-def get_casting_pipeline() -> CastingFeatureAEPipeline:
-    return CastingFeatureAEPipeline(device="auto")
 
 
 @st.cache_data

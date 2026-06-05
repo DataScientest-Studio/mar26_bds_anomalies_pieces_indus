@@ -15,7 +15,7 @@ st.set_page_config(page_title="Benchmark", page_icon="📊", layout="wide")
 
 st.title("📊 Benchmark MVTec AD — 15 catégories")
 st.markdown(
-    "Comparaison **Dinomaly seul · PatchCore seul · Ensemble Mean · Ensemble Max** "
+    "Comparaison **Dinomaly seul · PatchCore seul · Ensemble Mean** "
     "sur AUROC image, AUROC pixel et AUPIMO."
 )
 
@@ -32,14 +32,12 @@ st.markdown("### Moyennes globales (15 catégories)")
 mean_cols = [c for c in df.columns if c.endswith(("_img", "_pix", "_aupimo"))]
 means = df[mean_cols].mean()
 
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3 = st.columns(3)
 c1.metric("Dinomaly AUPIMO", f"{means['dino_aupimo']:.4f}")
 c2.metric("PatchCore AUPIMO", f"{means['pc_aupimo']:.4f}",
           delta=f"{means['pc_aupimo']-means['dino_aupimo']:+.4f}")
 c3.metric("Ensemble Mean", f"{means['mean_aupimo']:.4f}",
           delta=f"{means['mean_aupimo']-means['dino_aupimo']:+.4f}")
-c4.metric("Ensemble Max", f"{means['max_aupimo']:.4f}",
-          delta=f"{means['max_aupimo']-means['dino_aupimo']:+.4f}")
 
 # --- Tabs : tableau / barplot / per-defect ---
 tab1, tab2 = st.tabs(["📋 Tableau", "📈 Barplot AUPIMO"])
@@ -57,15 +55,15 @@ with tab1:
     }[metric]
 
     cols_show = ["category", "n_test", f"dino{metric_key}", f"pc{metric_key}",
-                 f"mean{metric_key}", f"max{metric_key}"]
+                 f"mean{metric_key}"]
     df_show = df[cols_show].copy()
     df_show["best"] = df_show[[f"dino{metric_key}", f"pc{metric_key}",
-                                 f"mean{metric_key}", f"max{metric_key}"]].idxmax(axis=1)
+                                 f"mean{metric_key}"]].idxmax(axis=1)
     df_show = df_show.sort_values(f"mean{metric_key}", ascending=False)
 
     st.dataframe(
         df_show.style.background_gradient(
-            subset=[f"dino{metric_key}", f"pc{metric_key}", f"mean{metric_key}", f"max{metric_key}"],
+            subset=[f"dino{metric_key}", f"pc{metric_key}", f"mean{metric_key}"],
             cmap="RdYlGn", vmin=0, vmax=1
         ).format(precision=4),
         width="stretch",
@@ -77,7 +75,7 @@ with tab2:
 
     df_long = df.melt(
         id_vars=["category"],
-        value_vars=["dino_aupimo", "pc_aupimo", "mean_aupimo", "max_aupimo"],
+        value_vars=["dino_aupimo", "pc_aupimo", "mean_aupimo"],
         var_name="modèle",
         value_name="AUPIMO",
     )
@@ -85,7 +83,6 @@ with tab2:
         "dino_aupimo": "Dinomaly",
         "pc_aupimo": "PatchCore",
         "mean_aupimo": "Ensemble Mean",
-        "max_aupimo": "Ensemble Max",
     })
 
     chart = (
@@ -108,9 +105,11 @@ st.markdown("### Cas marquants")
 
 best_mean = df.loc[df["mean_aupimo"].idxmax()]
 worst_mean = df.loc[df["mean_aupimo"].idxmin()]
-biggest_gain = df.assign(gain=df["mean_aupimo"] - df["dino_aupimo"]).sort_values("gain", ascending=False).iloc[0]
+# Use case industriel : on met en avant `cable` (catégorie cible de la démo).
+usecase_row = df.loc[df["category"] == "cable"].iloc[0]
+usecase_gain = usecase_row["mean_aupimo"] - usecase_row["dino_aupimo"]
 
 cc1, cc2, cc3 = st.columns(3)
 cc1.markdown(f"**🏆 Meilleure catégorie**\n`{best_mean['category']}`\nAUPIMO {best_mean['mean_aupimo']:.4f}")
 cc2.markdown(f"**🔻 Plus dure**\n`{worst_mean['category']}`\nAUPIMO {worst_mean['mean_aupimo']:.4f}")
-cc3.markdown(f"**⚡ Plus gros gain Ensemble**\n`{biggest_gain['category']}`\nΔ {biggest_gain['gain']:+.3f}")
+cc3.markdown(f"**⚡ Use case industriel**\n`{usecase_row['category']}`\nAUPIMO {usecase_row['mean_aupimo']:.4f} (Δ Ensemble {usecase_gain:+.3f})")

@@ -2,10 +2,10 @@
 
 Deux modes :
 - Single : un seul modèle, affichage détaillé.
-- Compare : 4 modèles côte-à-côte (Dinomaly / PatchCore / Mean / Max).
+- Compare : 3 modèles côte-à-côte (Dinomaly / PatchCore / Mean).
 
 Run :
-    uv run streamlit run app/main.py
+    uv run streamlit run app/Accueil.py
     → navigation vers "Live inference"
 """
 import sys
@@ -25,26 +25,11 @@ from PIL import Image
 from src.config import PATHS
 from src.inference.pipeline import AnomalyPipeline
 
-st.set_page_config(page_title="Live inference", page_icon="🔍", layout="wide")
+# Cache partagé entre main.py et les pages : MUST utiliser cette fonction.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _shared import MVTEC_CATEGORIES, MODEL_OPTIONS, get_pipeline  # noqa: E402
 
-MVTEC_CATEGORIES = [
-    "bottle", "cable", "capsule", "carpet", "grid",
-    "hazelnut", "leather", "metal_nut", "pill", "screw",
-    "tile", "toothbrush", "transistor", "wood", "zipper",
-]
-
-MODEL_OPTIONS = {
-    "Ensemble Mean": "ensemble_mean",
-    "Ensemble Max": "ensemble_max",
-    "Dinomaly seul": "dinomaly",
-    "PatchCore seul": "patchcore",
-}
-
-
-# --- Caches ----------------------------------------------------------------
-@st.cache_resource(show_spinner="Chargement du modèle…")
-def get_pipeline(category: str, model_name: str) -> AnomalyPipeline:
-    return AnomalyPipeline.from_category(category=category, model_name=model_name)
+st.set_page_config(page_title="MVTec", page_icon="🔍", layout="wide")
 
 
 @st.cache_data
@@ -72,20 +57,25 @@ def blend_overlay(image_resized: np.ndarray, overlay_rgba: np.ndarray, alpha: in
 def defect_only_overlay(
     image_resized: np.ndarray,
     heatmap_norm: np.ndarray,
-    threshold: float = 0.4,
+    threshold: float = 1.0,
     max_alpha: int = 210,
+    alpha_ramp: float = 2.0,
 ) -> Image.Image:
     """Superpose UNIQUEMENT les régions de défaut sur l'image.
 
-    Les pixels dont `heatmap_norm` < `threshold` restent totalement transparents
-    (image originale visible tel quel). Au-delà du seuil, l'opacité monte
-    linéairement avec l'intensité jusqu'à `max_alpha`.
+    `heatmap_norm` est non clippé (peut être < 0 ou > 1). Un pixel > `threshold`
+    (= 1.0 par défaut = au-dessus de train_max) est considéré défectueux.
+
+    - Couleur : jet appliqué à `clip(heatmap_norm, 0, 1)` → couleurs vives sur la
+      plage de training, saturées au rouge au-delà.
+    - Alpha : monte linéairement à partir de `threshold`. `alpha_ramp` contrôle
+      la vitesse d'opacité (2.0 = bien visible dès qu'un pixel dépasse train_max).
     """
     import matplotlib.cm as cm
     cmap = cm.get_cmap("jet")
     rgba = (cmap(np.clip(heatmap_norm, 0, 1)) * 255).astype(np.uint8)
-    above = np.clip(heatmap_norm - threshold, 0.0, 1.0) / max(1.0 - threshold, 1e-6)
-    rgba[..., 3] = (above * max_alpha).astype(np.uint8)
+    excess = np.clip((heatmap_norm - threshold) * alpha_ramp, 0.0, 1.0)
+    rgba[..., 3] = (excess * max_alpha).astype(np.uint8)
     base = Image.fromarray(image_resized).convert("RGBA")
     return Image.alpha_composite(base, Image.fromarray(rgba))
 
@@ -168,7 +158,6 @@ MODEL_TO_PREFIX = {
     "dinomaly": "dino",
     "patchcore": "pc",
     "ensemble_mean": "mean",
-    "ensemble_max": "max",
 }
 
 
@@ -226,12 +215,12 @@ def per_image_auroc_pixel(heatmap: np.ndarray, gt_mask: np.ndarray) -> Optional[
 
 
 # --- UI -------------------------------------------------------------------
-st.title("🔍 Inférence en direct")
+st.title("🔍 MVTec — Inférence en direct")
 
 with st.sidebar:
     st.header("Configuration")
     category = st.selectbox("Catégorie", MVTEC_CATEGORIES, index=1)
-    mode = st.radio("Mode", ["Single model", "Compare 4 models"], index=1)
+    mode = st.radio("Mode", ["Single model", "Compare 3 models"], index=1)
     if mode == "Single model":
         model_display = st.radio("Modèle", list(MODEL_OPTIONS.keys()), index=0)
         model_name = MODEL_OPTIONS[model_display]
@@ -265,6 +254,23 @@ with st.sidebar:
             st.warning("Le seuil défaut doit être strictement supérieur au seuil bon.")
             defect_threshold = good_threshold + 0.01
 
+    with st.expander("Affichage heatmap", expanded=False):
+        st.caption(
+            "Live tweak du rendu overlay. Pas de ré-inférence — uniquement le rendu."
+        )
+        overlay_threshold = st.slider(
+            "Seuil pixel (1.0 = train_max)", 0.50, 2.00, 1.00, 0.05,
+            help="Un pixel n'est coloré que si sa valeur normalisée dépasse ce seuil. 1.0 = au-dessus de la pire training. Baisser pour voir des activations plus subtiles.",
+        )
+        overlay_ramp = st.slider(
+            "Vitesse fade alpha", 0.5, 5.0, 2.0, 0.1,
+            help="Vitesse à laquelle l'opacité monte au-delà du seuil. Plus haut = transition plus nette.",
+        )
+        overlay_max_alpha = st.slider(
+            "Opacité max", 50, 255, 210, 5,
+            help="Opacité maximale de l'overlay sur les pixels saturés.",
+        )
+
     st.markdown("---")
     st.markdown("### Source de l'image")
     source = st.radio(
@@ -273,7 +279,7 @@ with st.sidebar:
 
 # --- Vérification ckpt ----------------------------------------------------
 ckpt_dir = PATHS.root / "models"
-needs_dino = mode == "Compare 4 models" or model_name in ("dinomaly", "ensemble_mean", "ensemble_max")
+needs_dino = mode == "Compare 3 models" or model_name in ("dinomaly", "ensemble_mean")
 has_dino_ckpt = ckpt_dir.exists() and any(ckpt_dir.glob(f"dinomaly_{category}*ckpt"))
 
 if needs_dino and not has_dino_ckpt:
@@ -292,9 +298,19 @@ if not test_dir.exists():
     )
     st.stop()
 
+# --- Pré-chargement eager du pipeline ------------------------------------
+# On utilise TOUJOURS le pipeline "ensemble_mean" (qui charge Dinomaly + PatchCore).
+# - Pour le mode Compare, c'est nécessaire.
+# - Pour le mode Single, on extrait le bon résultat via predict_all_modes() au lieu
+#   de construire une pipeline dédiée (qui serait un cache différent et re-loaderait
+#   les modèles depuis zéro).
+with st.spinner(f"Chargement modèle pour `{category}`…"):
+    get_pipeline(category=category, model_name="ensemble_mean")
+
 # --- Sélection de l'image -------------------------------------------------
 selected_image: Optional[Image.Image] = None
 selected_path: Optional[str] = None
+uploaded_key: Optional[str] = None  # identifiant stable pour upload (name+size)
 
 if source == "📁 Upload":
     uploaded = st.file_uploader(
@@ -302,7 +318,11 @@ if source == "📁 Upload":
         type=["png", "jpg", "jpeg"],
     )
     if uploaded is not None:
-        selected_image = Image.open(io.BytesIO(uploaded.read())).convert("RGB")
+        selected_image = Image.open(io.BytesIO(uploaded.getvalue())).convert("RGB")
+        uploaded_key = f"{uploaded.name}:{uploaded.size}"
+        # Persister pour retrouver l'image au prochain rerun (slider, etc.)
+        st.session_state["mvtec_selected_upload_key"] = uploaded_key
+        st.session_state["mvtec_selected_path"] = None
 else:
     examples = list_test_examples(category, max_per_class=4)
     if not examples:
@@ -319,6 +339,18 @@ else:
                         if col.button(f"Analyser", key=f"btn_{defect_type}_{i}"):
                             selected_path = p
                             selected_image = Image.open(p).convert("RGB")
+                            # Persister pour les reruns (sliders)
+                            st.session_state["mvtec_selected_path"] = p
+                            st.session_state["mvtec_selected_upload_key"] = None
+
+# --- Restauration depuis session_state pour survivre aux reruns ----------
+# Quand un slider bouge, Streamlit ré-exécute tout le script ; ce bloc
+# re-charge l'image qui était sélectionnée avant le rerun.
+if selected_image is None:
+    stored_path = st.session_state.get("mvtec_selected_path")
+    if stored_path and Path(stored_path).exists():
+        selected_path = stored_path
+        selected_image = Image.open(stored_path).convert("RGB")
 
 # --- Inférence ------------------------------------------------------------
 if selected_image is None:
@@ -327,12 +359,31 @@ if selected_image is None:
 
 st.markdown("---")
 
+# --- Cache key pour éviter de re-prédire à chaque slider move -----------
+# Clé stable entre reruns : chemin pour la galerie, nom+taille pour l'upload.
+def _image_key() -> str:
+    if selected_path:
+        return f"path:{selected_path}"
+    upload_key = uploaded_key or st.session_state.get("mvtec_selected_upload_key")
+    if upload_key:
+        return f"upload:{upload_key}"
+    return ""
+
+
 # --- Mode 1 : Single model ------------------------------------------------
 if mode == "Single model":
     st.subheader(f"Résultat — {model_display}")
-    pipe = get_pipeline(category=category, model_name=model_name)
-    with st.spinner("Inférence…"):
-        result = pipe.predict(selected_image)
+    # Toujours utiliser la pipeline ensemble_mean (déjà warmed au boot) et
+    # extraire le résultat du mode choisi via predict_all_modes.
+    # → un seul jeu de modèles en mémoire par catégorie, partagé Single + Compare.
+    pipe = get_pipeline(category=category, model_name="ensemble_mean")
+    cache_key = f"{_image_key()}:{category}"  # partagé Single ↔ Compare (même predict_all_modes)
+    if st.session_state.get("live_last_key") != cache_key:
+        with st.spinner("Inférence…"):
+            st.session_state["live_last_result"] = pipe.predict_all_modes(selected_image)
+            st.session_state["live_last_key"] = cache_key
+    all_results = st.session_state["live_last_result"]
+    result = all_results[model_name]
 
     # Tente de charger le GT mask si l'image vient de la galerie
     gt_mask = None
@@ -347,19 +398,31 @@ if mode == "Single model":
         gt_overlay = blend_overlay(result.image_resized, gt_rgba, alpha=200)
         cols[1].image(gt_overlay, caption="GT overlay", width="stretch")
         cols[2].image(
-            defect_only_overlay(result.image_resized, result.heatmap_norm),
+            defect_only_overlay(
+                result.image_resized, result.heatmap_norm,
+                threshold=overlay_threshold, alpha_ramp=overlay_ramp,
+                max_alpha=overlay_max_alpha,
+            ),
             caption="Pred overlay", width="stretch",
         )
     else:
         cols[1].image(
-            defect_only_overlay(result.image_resized, result.heatmap_norm),
+            defect_only_overlay(
+                result.image_resized, result.heatmap_norm,
+                threshold=overlay_threshold, alpha_ramp=overlay_ramp,
+                max_alpha=overlay_max_alpha,
+            ),
             caption="Pred overlay", width="stretch",
         )
 
     sc1, sc2, sc3 = st.columns(3)
+    is_saturated = result.score in (0.0, 1.0) and result.score != result.score_raw
+    score_label = f"{result.score:.4f}"
+    if is_saturated:
+        score_label = f"{result.score:.4f} (brut: {result.score_raw:+.4f})"
     sc1.metric(
-        "Score anomalie [0, 1]", f"{result.score:.4f}",
-        help="Max après lissage médian 3×3, normalisé contre 100 train good. 0 = image ressemble au pire good vu pendant le fit. 1 = bien plus anomal que tout le train good.",
+        "Score anomalie [0, 1]", score_label,
+        help="Max après lissage médian 3×3, normalisé contre 100 train good. 0 = image ressemble au pire good vu pendant le fit. 1 = bien plus anomal que tout le train good. Le score brut entre parenthèses est non clippé : négatif = bien sous la baseline good, > 1 = bien au-dessus.",
     )
     sc2.metric("Modèle", model_display)
     sc3.metric("Catégorie", category)
@@ -398,16 +461,20 @@ if mode == "Single model":
         "**AUROC pixel sur cette image** = score local de localisation (vs GT mask)."
     )
 
-# --- Mode 2 : Compare 4 modèles -------------------------------------------
+# --- Mode 2 : Compare 3 modèles -------------------------------------------
 else:
-    st.subheader(f"Comparaison 4 modèles — `{category}`")
+    st.subheader(f"Comparaison 3 modèles — `{category}`")
 
     # Une seule pipeline (ensemble_mean charge Dinomaly + PatchCore), puis
     # predict_all_modes réutilise les heatmaps pour produire les 4 résultats.
     # ~3× plus rapide que 4 appels predict() séparés.
     pipe = get_pipeline(category=category, model_name="ensemble_mean")
-    with st.spinner("Inférence 4 modèles…"):
-        raw_results = pipe.predict_all_modes(selected_image)
+    cache_key = f"{_image_key()}:{category}"  # même clé que Single → pas de re-predict au switch
+    if st.session_state.get("live_last_key") != cache_key:
+        with st.spinner("Inférence 3 modèles…"):
+            st.session_state["live_last_result"] = pipe.predict_all_modes(selected_image)
+            st.session_state["live_last_key"] = cache_key
+    raw_results = st.session_state["live_last_result"]
     results = {label: raw_results[mn] for label, mn in MODEL_OPTIONS.items()}
 
     # Tente de charger le GT mask
@@ -433,17 +500,25 @@ else:
             width="stretch",
         )
 
-    # 4 colonnes : 1 par modèle
+    # 3 colonnes : 1 par modèle (Dinomaly / PatchCore / Ensemble Mean)
     st.markdown("#### Heatmaps par modèle")
-    cols = st.columns(4)
+    cols = st.columns(3)
     per_image_aurocs = {}
     for col, (label, result) in zip(cols, results.items()):
         col.markdown(f"**{label}**")
         col.image(
-            defect_only_overlay(result.image_resized, result.heatmap_norm),
+            defect_only_overlay(
+                result.image_resized, result.heatmap_norm,
+                threshold=overlay_threshold, alpha_ramp=overlay_ramp,
+                max_alpha=overlay_max_alpha,
+            ),
             width="stretch",
         )
-        col.metric("Score", f"{result.score:.4f}")
+        if result.score in (0.0, 1.0) and result.score != result.score_raw:
+            col.metric("Score", f"{result.score:.4f}",
+                       help=f"Brut non clippé : {result.score_raw:+.4f}")
+        else:
+            col.metric("Score", f"{result.score:.4f}")
         # AUROC pixel per-image si GT disponible
         if gt_mask is not None and gt_mask.sum() > 0:
             auroc = per_image_auroc_pixel(result.heatmap, gt_mask)
@@ -456,7 +531,7 @@ else:
         results["Ensemble Mean"].score, good_threshold, defect_threshold
     )
 
-    # --- Tableau benchmark 4 modèles pour cette catégorie ---
+    # --- Tableau benchmark 3 modèles pour cette catégorie ---
     bench = load_benchmark_csv()
     if bench is not None and category in bench["category"].values:
         st.markdown("#### Benchmark dataset-level (test set complet)")

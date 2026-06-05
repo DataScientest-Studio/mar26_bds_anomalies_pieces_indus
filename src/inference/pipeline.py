@@ -53,7 +53,8 @@ ModelName = Literal["dinomaly", "patchcore", "ensemble_mean", "ensemble_max"]
 class PredictionResult:
     """RÃ©sultat d'une infÃ©rence sur une image."""
 
-    score: float  # score image-level (max de la heatmap normalisÃ©e)
+    score: float  # score image-level clippé à [0, 1] pour usage UI
+    score_raw: float  # score brut non clippé (peut être < 0 ou > 1)
     heatmap: np.ndarray  # (H, W) float32 â€” heatmap brute du modÃ¨le choisi
     heatmap_norm: np.ndarray  # (H, W) float32 â€” heatmap normalisÃ©e global-minmax [0,1]
     overlay: np.ndarray  # (H, W, 4) uint8 â€” heatmap colormap jet + alpha, prÃªte Ã  display
@@ -124,8 +125,9 @@ class AnomalyPipeline:
                 self._dino, calib_paths, img_size=dino_img_size, batch_size=4
             )
             per_image_dino = np.array([_aggregate_score(m) for m in h_calib_dino])
-            self.dino_min = float(per_image_dino.min())
-            self.dino_max = float(per_image_dino.max())
+            # Bornes p1/p99 : trim les 1% les plus extrêmes (outliers training).
+            self.dino_min = float(np.percentile(per_image_dino, 1))
+            self.dino_max = float(np.percentile(per_image_dino, 99))
 
         # Construction PatchCore si nÃ©cessaire
         if model_name in ("patchcore", "ensemble_mean", "ensemble_max"):
@@ -135,8 +137,8 @@ class AnomalyPipeline:
             self._patchcore.fit(train_paths)
             h_calib_pc = self._patchcore.score(calib_paths)
             per_image_pc = np.array([_aggregate_score(m) for m in h_calib_pc])
-            self.pc_min = float(per_image_pc.min())
-            self.pc_max = float(per_image_pc.max())
+            self.pc_min = float(np.percentile(per_image_pc, 1))
+            self.pc_max = float(np.percentile(per_image_pc, 99))
 
     def _train_dir(self) -> Path:
         """Localise le dossier train/good pour la catÃ©gorie (MVTec ou HSS-IAD)."""
@@ -179,7 +181,9 @@ class AnomalyPipeline:
                 return None, None
             agg = _aggregate_score(h_raw)
             score = (agg - mx) / (mx - mn + 1e-8)
-            # Heatmap normalisée pour affichage (référence stats train good)
+            # Heatmap pixel-wise : (h - min) / (max - min).
+            # → couleur vive sur la plage [min, max], et tout pixel > max donne h_norm > 1
+            #   (utilisé par defect_only_overlay comme masque d'opacité).
             h_norm = (h_raw - mn) / (mx - mn + 1e-8)
             return score, h_norm
 
@@ -211,17 +215,19 @@ class AnomalyPipeline:
 
         # Clip pour usage UI [0, 1]
         score_clipped = float(np.clip(score, 0.0, 1.0))
-        # heatmap_norm peut dÃ©passer 1 si dÃ©faut trÃ¨s net â†’ clip pour le colormap jet
-        heatmap_norm_display = np.clip(heatmap_norm, 0.0, 1.0).astype(np.float32)
+        # heatmap_norm conservé NON clippé : un pixel > 1 = au-dessus de train_max,
+        # info utilisée par defect_only_overlay pour gater l'opacité.
+        heatmap_norm_unclipped = heatmap_norm.astype(np.float32)
 
         target_shape = heatmap_norm.shape
         img_resized = np.array(image.resize(target_shape[::-1], Image.BILINEAR))
-        overlay = _to_jet_overlay(heatmap_norm_display)
+        overlay = _to_jet_overlay(heatmap_norm_unclipped)  # _to_jet_overlay clip en interne
 
         return PredictionResult(
             score=score_clipped,
+            score_raw=float(score),
             heatmap=(heatmap if heatmap is not None else heatmap_norm).astype(np.float32),
-            heatmap_norm=heatmap_norm_display,
+            heatmap_norm=heatmap_norm_unclipped,
             overlay=overlay,
             image_resized=img_resized,
             model_name=self.model_name,
@@ -238,14 +244,16 @@ class AnomalyPipeline:
     ) -> PredictionResult:
         """Construit un PredictionResult à partir d'une heatmap brute et normalisée."""
         score_clipped = float(np.clip(score, 0.0, 1.0))
-        heatmap_norm_display = np.clip(heatmap_norm, 0.0, 1.0).astype(np.float32)
+        # heatmap_norm conservé NON clippé (cf. predict()).
+        heatmap_norm_unclipped = heatmap_norm.astype(np.float32)
         target_shape = heatmap_norm.shape
         img_resized = np.array(image.resize(target_shape[::-1], Image.BILINEAR))
-        overlay = _to_jet_overlay(heatmap_norm_display)
+        overlay = _to_jet_overlay(heatmap_norm_unclipped)  # clip en interne
         return PredictionResult(
             score=score_clipped,
+            score_raw=float(score),
             heatmap=heatmap.astype(np.float32),
-            heatmap_norm=heatmap_norm_display,
+            heatmap_norm=heatmap_norm_unclipped,
             overlay=overlay,
             image_resized=img_resized,
             model_name=model_name,
@@ -276,6 +284,8 @@ class AnomalyPipeline:
         h_pc = self._patchcore.score_image(image)
 
         # Normalisation contre stats train good (idem predict()).
+        # h_norm pixel-wise utilise (h - min) / (max - min) → couleurs vives ;
+        # tout pixel > train_max donne h_norm > 1 → utilisé comme masque d'opacité par l'overlay.
         agg_dino = _aggregate_score(h_dino)
         score_dino = (agg_dino - self.dino_max) / (self.dino_max - self.dino_min + 1e-8)
         h_dino_n = (h_dino - self.dino_min) / (self.dino_max - self.dino_min + 1e-8)
